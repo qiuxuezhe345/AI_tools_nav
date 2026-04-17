@@ -1,6 +1,7 @@
 "use server";
 
 import { encodedRedirect } from "@/utils/utils";
+import { isAdminUser } from "@/utils/supabase/admin-users";
 import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -12,11 +13,7 @@ export const signUpAction = async (formData: FormData) => {
   const origin = (await headers()).get("origin");
 
   if (!email || !password) {
-    return encodedRedirect(
-      "error",
-      "/sign-up",
-      "Email and password are required",
-    );
+    return encodedRedirect("error", "/sign-up", "请输入邮箱和密码");
   }
 
   const { error } = await supabase.auth.signUp({
@@ -30,13 +27,9 @@ export const signUpAction = async (formData: FormData) => {
   if (error) {
     console.error(error.code + " " + error.message);
     return encodedRedirect("error", "/sign-up", error.message);
-  } else {
-    return encodedRedirect(
-      "success",
-      "/sign-up",
-      "Thanks for signing up! Please check your email for a verification link.",
-    );
   }
+
+  return encodedRedirect("success", "/sign-up", "注册成功，请前往邮箱查收验证邮件。");
 };
 
 export const signInAction = async (formData: FormData) => {
@@ -44,13 +37,21 @@ export const signInAction = async (formData: FormData) => {
   const password = formData.get("password") as string;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return encodedRedirect("error", "/sign-in", error.message);
+  }
+
+  if (!user || !(await isAdminUser(user.id))) {
+    await supabase.auth.signOut();
+    return encodedRedirect("error", "/sign-in", "当前账号不是管理员，无法登录后台");
   }
 
   return redirect("/protected");
@@ -63,7 +64,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
   const callbackUrl = formData.get("callbackUrl")?.toString();
 
   if (!email) {
-    return encodedRedirect("error", "/forgot-password", "Email is required");
+    return encodedRedirect("error", "/forgot-password", "请输入邮箱");
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -75,7 +76,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
     return encodedRedirect(
       "error",
       "/forgot-password",
-      "Could not reset password",
+      "发送重置邮件失败，请稍后再试",
     );
   }
 
@@ -86,7 +87,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
   return encodedRedirect(
     "success",
     "/forgot-password",
-    "Check your email for a link to reset your password.",
+    "重置邮件已发送，请前往邮箱查看。",
   );
 };
 
@@ -100,7 +101,7 @@ export const resetPasswordAction = async (formData: FormData) => {
     encodedRedirect(
       "error",
       "/protected/reset-password",
-      "Password and confirm password are required",
+      "请输入新密码和确认密码",
     );
   }
 
@@ -108,7 +109,7 @@ export const resetPasswordAction = async (formData: FormData) => {
     encodedRedirect(
       "error",
       "/protected/reset-password",
-      "Passwords do not match",
+      "两次输入的密码不一致",
     );
   }
 
@@ -120,11 +121,11 @@ export const resetPasswordAction = async (formData: FormData) => {
     encodedRedirect(
       "error",
       "/protected/reset-password",
-      "Password update failed",
+      "密码更新失败，请稍后重试",
     );
   }
 
-  encodedRedirect("success", "/protected/reset-password", "Password updated");
+  encodedRedirect("success", "/protected/reset-password", "密码已更新");
 };
 
 export const signOutAction = async () => {

@@ -1,3 +1,4 @@
+import { isAdminUser } from "@/utils/supabase/admin-users";
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -37,15 +38,36 @@ export const updateSession = async (request: NextRequest) => {
 
     // This will refresh session if expired - required for Server Components
     // https://supabase.com/docs/guides/auth/server-side/nextjs
-    const user = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
     // protected routes
-    if (request.nextUrl.pathname.startsWith("/protected") && user.error) {
+    if (request.nextUrl.pathname.startsWith("/protected") && userError) {
       return NextResponse.redirect(new URL("/sign-in", request.url));
     }
 
-    if (request.nextUrl.pathname === "/" && !user.error) {
-      return NextResponse.redirect(new URL("/protected", request.url));
+    if (request.nextUrl.pathname.startsWith("/protected") && user) {
+      const admin = await isAdminUser(user.id);
+
+      if (!admin) {
+        await supabase.auth.signOut();
+        return NextResponse.redirect(
+          new URL(
+            `/sign-in?error=${encodeURIComponent("当前账号不是管理员，无法登录后台")}`,
+            request.url,
+          ),
+        );
+      }
+    }
+
+    if (request.nextUrl.pathname === "/" && user) {
+      const admin = await isAdminUser(user.id);
+
+      if (admin) {
+        return NextResponse.redirect(new URL("/protected", request.url));
+      }
     }
 
     return response;

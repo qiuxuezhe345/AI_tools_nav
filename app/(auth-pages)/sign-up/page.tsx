@@ -10,9 +10,10 @@ export default async function Signup(props: {
   searchParams: Promise<Message>;
 }) {
   const searchParams = await props.searchParams;
+
   if ("message" in searchParams) {
     return (
-      <div className="w-full flex-1 flex items-center h-screen sm:max-w-md justify-center gap-2 p-4">
+      <div className="flex items-center justify-center">
         <FormMessage message={searchParams} />
       </div>
     );
@@ -20,32 +21,44 @@ export default async function Signup(props: {
 
   return (
     <>
-      <form className="flex flex-col min-w-64 max-w-64 mx-auto">
-        <h1 className="text-2xl font-medium">Sign up</h1>
-        <p className="text-sm text text-foreground">
-          Already have an account?{" "}
-          <Link className="text-primary font-medium underline" href="/sign-in">
-            Sign in
-          </Link>
-        </p>
-        <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
-          <Label htmlFor="email">Email</Label>
+      <form className="flex flex-col gap-6">
+        <div className="space-y-2 text-center">
+          <h1 className="text-2xl font-medium">注册账号</h1>
+          <p className="text-sm text-muted-foreground">
+            已经有账号了？
+            <Link className="ml-1 font-medium underline" href="/sign-in">
+              前往登录
+            </Link>
+          </p>
+          <p className="text-xs leading-5 text-muted-foreground">
+            注册后默认为普通用户，只有管理员账号才能进入后台。
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 [&>input]:mb-3">
+          <Label htmlFor="email">邮箱</Label>
           <Input name="email" placeholder="you@example.com" required />
-          <Label htmlFor="password">Password</Label>
+
+          <Label htmlFor="password">密码</Label>
           <Input
             type="password"
             name="password"
-            placeholder="Your password"
+            placeholder="请设置密码"
             minLength={6}
             required
           />
-          <SubmitButton formAction={signUpAction} pendingText="Signing up...">
-            Sign up
+
+          <SubmitButton formAction={signUpAction} pendingText="注册中...">
+            立即注册
           </SubmitButton>
+
           <FormMessage message={searchParams} />
         </div>
       </form>
-      <SmtpMessage />
+
+      <div className="mt-6">
+        <SmtpMessage />
+      </div>
     </>
   );
 }
