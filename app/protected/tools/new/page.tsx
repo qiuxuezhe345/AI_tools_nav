@@ -1,31 +1,47 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ToolCreateForm } from "@/components/admin/tool-create-form";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default function NewToolPage() {
-  return (
-    <section className="rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-      <div className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-xl font-semibold text-white">添加 AI 工具</h2>
-          <p className="mt-2 text-sm leading-6 text-white/60">
-            这里将用于创建新的 AI 工具。下一步可以继续按 PRD 接入新增工具表单、字段校验和提交写入逻辑。
-          </p>
-        </div>
+type CategoriesResponse = {
+  categories: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    is_active: boolean;
+    sort_order: number;
+  }>;
+};
 
-        <div className="rounded-2xl border border-dashed border-white/15 px-5 py-10 text-center text-sm text-white/60">
-          新增工具表单尚未接入，这里先提供独立入口页面，便于后续继续实现完整创建流程。
-        </div>
+async function getCategories() {
+  const headerStore = await headers();
+  const host = headerStore.get("host");
+  const cookie = headerStore.get("cookie") ?? "";
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
 
-        <div>
-          <Button
-            asChild
-            variant="outline"
-            className="border-white/15 bg-transparent text-white hover:bg-white hover:text-black"
-          >
-            <Link href="/protected/tools">返回 AI 工具管理</Link>
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
+  if (!host) {
+    throw new Error("无法获取当前请求地址");
+  }
+
+  const response = await fetch(`${protocol}://${host}/api/admin/tool-categories`, {
+    headers: {
+      cookie,
+    },
+    cache: "no-store",
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    redirect("/sign-in?error=当前账号没有后台访问权限");
+  }
+
+  if (!response.ok) {
+    throw new Error("分类数据加载失败");
+  }
+
+  return (await response.json()) as CategoriesResponse;
+}
+
+export default async function NewToolPage() {
+  const data = await getCategories();
+
+  return <ToolCreateForm categories={data.categories} />;
 }
