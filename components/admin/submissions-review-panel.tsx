@@ -2,13 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import { renderMarkdown } from "@/lib/markdown";
-import type { AdminSubmission } from "@/lib/admin-submissions";
+import type {
+  AdminSubmission,
+  SubmissionCounts,
+  SubmissionStatus,
+} from "@/lib/admin-submissions";
 import { Eye, X } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type Props = {
   submissions: AdminSubmission[];
+  counts: SubmissionCounts;
+  activeStatus: SubmissionStatus;
 };
 
 function formatDate(value: string | null) {
@@ -25,7 +32,20 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-export function SubmissionsReviewPanel({ submissions }: Props) {
+const statusTabs: Array<{
+  key: SubmissionStatus;
+  label: string;
+}> = [
+  { key: "pending", label: "待审核" },
+  { key: "approved", label: "已通过" },
+  { key: "rejected", label: "已驳回" },
+];
+
+export function SubmissionsReviewPanel({
+  submissions,
+  counts,
+  activeStatus,
+}: Props) {
   const router = useRouter();
   const [selectedSubmission, setSelectedSubmission] =
     useState<AdminSubmission | null>(null);
@@ -41,6 +61,13 @@ export function SubmissionsReviewPanel({ submissions }: Props) {
   const previewHtml = useMemo(() => {
     return renderMarkdown(selectedSubmission?.content ?? "");
   }, [selectedSubmission]);
+
+  const headerText =
+    activeStatus === "pending"
+      ? "默认展示待审核提交。管理员可以查看详情、通过审核或驳回提交。"
+      : activeStatus === "approved"
+        ? "这里展示所有已审核通过的提交记录，可查看通过后的详细内容。"
+        : "这里展示所有已驳回的提交记录，可查看驳回原因和提交详情。";
 
   async function reviewSubmission(id: number, action: "approve" | "reject") {
     setFeedback(null);
@@ -87,13 +114,32 @@ export function SubmissionsReviewPanel({ submissions }: Props) {
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-white">审核中心</h2>
-          <p className="text-sm text-white/60">
-            默认展示所有待审核提交。管理员可以查看详情、通过审核或驳回提交。
-          </p>
+          <p className="text-sm text-white/60">{headerText}</p>
         </div>
         <div className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
-          待审核 {submissions.length} 条
+          当前 {submissions.length} 条
         </div>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-3">
+        {statusTabs.map((tab) => {
+          const isActive = activeStatus === tab.key;
+          const count = counts[tab.key];
+
+          return (
+            <Link
+              key={tab.key}
+              href={`/admin/submissions?status=${tab.key}`}
+              className={
+                isActive
+                  ? "rounded-full border border-white bg-white px-4 py-2 text-sm font-medium text-black"
+                  : "rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
+              }
+            >
+              {tab.label} {count}
+            </Link>
+          );
+        })}
       </div>
 
       {feedback ? (
@@ -160,26 +206,40 @@ export function SubmissionsReviewPanel({ submissions }: Props) {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          type="button"
-                          className="h-10 min-w-[96px] justify-center bg-white text-black hover:bg-white/90"
-                          disabled={Boolean(currentPending)}
-                          onClick={() => reviewSubmission(item.id, "approve")}
-                        >
-                          {currentPending === "approve" ? "通过中..." : "通过"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 min-w-[96px] justify-center border-rose-500/30 bg-transparent text-rose-200 hover:bg-rose-500 hover:text-white"
-                          disabled={Boolean(currentPending)}
-                          onClick={() => {
-                            setSelectedSubmission(item);
-                            setReviewNotes(item.review_notes ?? "");
-                          }}
-                        >
-                          驳回
-                        </Button>
+                        {activeStatus === "pending" ? (
+                          <>
+                            <Button
+                              type="button"
+                              className="h-10 min-w-[96px] justify-center bg-white text-black hover:bg-white/90"
+                              disabled={Boolean(currentPending)}
+                              onClick={() => reviewSubmission(item.id, "approve")}
+                            >
+                              {currentPending === "approve" ? "通过中..." : "通过"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-10 min-w-[96px] justify-center border-rose-500/30 bg-transparent text-rose-200 hover:bg-rose-500 hover:text-white"
+                              disabled={Boolean(currentPending)}
+                              onClick={() => {
+                                setSelectedSubmission(item);
+                                setReviewNotes(item.review_notes ?? "");
+                              }}
+                            >
+                              驳回
+                            </Button>
+                          </>
+                        ) : (
+                          <span
+                            className={
+                              activeStatus === "approved"
+                                ? "rounded-full bg-emerald-500/15 px-3 py-2 text-xs font-medium text-emerald-200"
+                                : "rounded-full bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-200"
+                            }
+                          >
+                            {activeStatus === "approved" ? "已通过" : "已驳回"}
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -297,6 +357,12 @@ export function SubmissionsReviewPanel({ submissions }: Props) {
                 rows={4}
                 className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-white/30"
               />
+              {activeStatus !== "pending" && selectedSubmission.review_notes ? (
+                <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/65">
+                  备注：{selectedSubmission.review_notes}
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap justify-end gap-3">
                 <Button
                   type="button"
@@ -307,33 +373,37 @@ export function SubmissionsReviewPanel({ submissions }: Props) {
                     setReviewNotes("");
                   }}
                 >
-                  取消
+                  关闭
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-rose-500/30 bg-transparent text-rose-200 hover:bg-rose-500 hover:text-white"
-                  disabled={isPending && pendingId === selectedSubmission.id}
-                  onClick={() => reviewSubmission(selectedSubmission.id, "reject")}
-                >
-                  {isPending &&
-                  pendingId === selectedSubmission.id &&
-                  pendingAction === "reject"
-                    ? "驳回中..."
-                    : "确认驳回"}
-                </Button>
-                <Button
-                  type="button"
-                  className="bg-white text-black hover:bg-white/90"
-                  disabled={isPending && pendingId === selectedSubmission.id}
-                  onClick={() => reviewSubmission(selectedSubmission.id, "approve")}
-                >
-                  {isPending &&
-                  pendingId === selectedSubmission.id &&
-                  pendingAction === "approve"
-                    ? "通过中..."
-                    : "确认通过"}
-                </Button>
+                {activeStatus === "pending" ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-rose-500/30 bg-transparent text-rose-200 hover:bg-rose-500 hover:text-white"
+                      disabled={isPending && pendingId === selectedSubmission.id}
+                      onClick={() => reviewSubmission(selectedSubmission.id, "reject")}
+                    >
+                      {isPending &&
+                      pendingId === selectedSubmission.id &&
+                      pendingAction === "reject"
+                        ? "驳回中..."
+                        : "确认驳回"}
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-white text-black hover:bg-white/90"
+                      disabled={isPending && pendingId === selectedSubmission.id}
+                      onClick={() => reviewSubmission(selectedSubmission.id, "approve")}
+                    >
+                      {isPending &&
+                      pendingId === selectedSubmission.id &&
+                      pendingAction === "approve"
+                        ? "通过中..."
+                        : "确认通过"}
+                    </Button>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>

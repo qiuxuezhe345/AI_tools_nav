@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+export type SubmissionStatus = "pending" | "approved" | "rejected";
+
 export type AdminSubmission = {
   id: number;
   user_id: string;
@@ -13,12 +15,18 @@ export type AdminSubmission = {
   cover_image_url: string | null;
   short_description: string;
   content: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: SubmissionStatus;
   review_notes: string | null;
   reviewed_at: string | null;
   approved_tool_id: number | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+export type SubmissionCounts = {
+  pending: number;
+  approved: number;
+  rejected: number;
 };
 
 async function fetchAdminJson<T>(path: string) {
@@ -49,10 +57,11 @@ async function fetchAdminJson<T>(path: string) {
   return (await response.json()) as T;
 }
 
-export async function getPendingSubmissions() {
-  const response = await fetchAdminJson<{ submissions: AdminSubmission[] }>(
-    "/api/admin/submissions",
-  );
+export async function getSubmissions(status: SubmissionStatus) {
+  const response = await fetchAdminJson<{
+    submissions: AdminSubmission[];
+    counts: SubmissionCounts;
+  }>(`/api/admin/submissions?status=${status}`);
 
-  return response.submissions;
+  return response;
 }

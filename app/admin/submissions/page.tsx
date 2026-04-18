@@ -1,8 +1,23 @@
 import { SubmissionsReviewPanel } from "@/components/admin/submissions-review-panel";
-import { getPendingSubmissions } from "@/lib/admin-submissions";
+import { getSubmissions, type SubmissionStatus } from "@/lib/admin-submissions";
 
-export default async function AdminSubmissionsPage() {
-  const submissions = await getPendingSubmissions();
+export default async function AdminSubmissionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const params = await searchParams;
+  const status =
+    params.status === "approved" || params.status === "rejected"
+      ? params.status
+      : "pending";
+  const data = await getSubmissions(status as SubmissionStatus);
 
-  return <SubmissionsReviewPanel submissions={submissions} />;
+  return (
+    <SubmissionsReviewPanel
+      submissions={data.submissions}
+      counts={data.counts}
+      activeStatus={status as SubmissionStatus}
+    />
+  );
 }
