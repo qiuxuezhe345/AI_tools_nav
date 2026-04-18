@@ -59,7 +59,52 @@ function isValidUrl(url: string) {
   }
 }
 
-async function validatePayload(payload: ToolPayload, currentToolId?: number) {
+async function getToolById(id: number) {
+  const adminClient = createAdminClient();
+
+  const { data, error } = await adminClient
+    .from("ai_tools")
+    .select(
+      "id, category_id, name, slug, website_url, logo_url, cover_image_url, short_description, content, is_hot, is_new, status, published_at, created_at, updated_at, tool_categories(name)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    return { error: "读取工具详情失败", data: null };
+  }
+
+  if (!data) {
+    return { error: "工具不存在", data: null };
+  }
+
+  return {
+    error: null,
+    data: {
+      id: data.id,
+      category_id: data.category_id,
+      name: data.name,
+      slug: data.slug,
+      website_url: data.website_url,
+      logo_url: data.logo_url,
+      cover_image_url: data.cover_image_url,
+      short_description: data.short_description,
+      content: data.content,
+      is_hot: data.is_hot,
+      is_new: data.is_new,
+      status: data.status,
+      published_at: data.published_at,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      category_name:
+        Array.isArray((data as any).tool_categories)
+          ? (data as any).tool_categories[0]?.name ?? "未分类"
+          : (data as any).tool_categories?.name ?? "未分类",
+    },
+  };
+}
+
+async function validatePayload(payload: ToolPayload, toolId: number) {
   const adminClient = createAdminClient();
   const categoryId = Number(payload.category_id);
   const name = payload.name?.trim() ?? "";
@@ -109,14 +154,12 @@ async function validatePayload(payload: ToolPayload, currentToolId?: number) {
         .eq("id", categoryId)
         .eq("is_active", true)
         .maybeSingle(),
-      currentToolId
-        ? adminClient
-            .from("ai_tools")
-            .select("id")
-            .eq("slug", slug)
-            .neq("id", currentToolId)
-            .maybeSingle()
-        : adminClient.from("ai_tools").select("id").eq("slug", slug).maybeSingle(),
+      adminClient
+        .from("ai_tools")
+        .select("id")
+        .eq("slug", slug)
+        .neq("id", toolId)
+        .maybeSingle(),
       adminClient
         .from("tool_submissions")
         .select("id")
@@ -149,59 +192,68 @@ async function validatePayload(payload: ToolPayload, currentToolId?: number) {
   };
 }
 
-export async function GET() {
-  const auth = await requireAdmin();
-
-  if (auth.error) {
-    return auth.error;
-  }
-
-  const adminClient = createAdminClient();
-  const { data, error } = await adminClient
-    .from("ai_tools")
-    .select(
-      "id, category_id, name, slug, website_url, logo_url, cover_image_url, short_description, content, is_hot, is_new, status, published_at, created_at, updated_at, tool_categories(name)",
-    )
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ message: "工具列表加载失败" }, { status: 500 });
-  }
-
-  const tools = (data ?? []).map((item: any) => ({
-    id: item.id,
-    category_id: item.category_id,
-    name: item.name,
-    slug: item.slug,
-    website_url: item.website_url,
-    logo_url: item.logo_url,
-    cover_image_url: item.cover_image_url,
-    short_description: item.short_description,
-    content: item.content,
-    is_hot: item.is_hot,
-    is_new: item.is_new,
-    status: item.status,
-    published_at: item.published_at,
-    created_at: item.created_at,
-    updated_at: item.updated_at,
-    category_name:
-      Array.isArray(item.tool_categories)
-        ? item.tool_categories[0]?.name ?? "未分类"
-        : item.tool_categories?.name ?? "未分类",
-  }));
-
-  return NextResponse.json({ tools });
+function parseId(value: string) {
+  const id = Number(value);
+  return Number.isFinite(id) ? id : null;
 }
 
-export async function POST(request: Request) {
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
   const auth = await requireAdmin();
 
   if (auth.error) {
     return auth.error;
+  }
+
+  const { id: rawId } = await context.params;
+  const id = parseId(rawId);
+
+  if (!id) {
+    return NextResponse.json({ message: "工具 ID 不合法" }, { status: 400 });
+  }
+
+  const tool = await getToolById(id);
+
+  if (tool.error) {
+    return NextResponse.json(
+      { message: tool.error },
+      { status: tool.error === "工具不存在" ? 404 : 500 },
+    );
+  }
+
+  return NextResponse.json({ tool: tool.data });
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAdmin();
+
+  if (auth.error) {
+    return auth.error;
+  }
+
+  const { id: rawId } = await context.params;
+  const id = parseId(rawId);
+
+  if (!id) {
+    return NextResponse.json({ message: "工具 ID 不合法" }, { status: 400 });
+  }
+
+  const exists = await getToolById(id);
+
+  if (exists.error) {
+    return NextResponse.json(
+      { message: exists.error },
+      { status: exists.error === "工具不存在" ? 404 : 500 },
+    );
   }
 
   const payload = (await request.json()) as ToolPayload;
-  const validated = await validatePayload(payload);
+  const validated = await validatePayload(payload, id);
 
   if (validated.error) {
     return NextResponse.json({ message: validated.error }, { status: 400 });
@@ -212,20 +264,59 @@ export async function POST(request: Request) {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient
     .from("ai_tools")
-    .insert({
+    .update({
       ...toolData,
       published_at:
-        toolData.status === "published" ? new Date().toISOString() : null,
+        toolData.status === "published"
+          ? exists.data?.published_at ?? new Date().toISOString()
+          : null,
     })
+    .eq("id", id)
     .select("id, slug")
     .single();
 
   if (error) {
-    return NextResponse.json({ message: "写入 AI 工具失败" }, { status: 500 });
+    return NextResponse.json({ message: "更新 AI 工具失败" }, { status: 500 });
   }
 
   return NextResponse.json({
-    message: "AI 工具添加成功",
+    message: "AI 工具更新成功",
     tool: data,
   });
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAdmin();
+
+  if (auth.error) {
+    return auth.error;
+  }
+
+  const { id: rawId } = await context.params;
+  const id = parseId(rawId);
+
+  if (!id) {
+    return NextResponse.json({ message: "工具 ID 不合法" }, { status: 400 });
+  }
+
+  const exists = await getToolById(id);
+
+  if (exists.error) {
+    return NextResponse.json(
+      { message: exists.error },
+      { status: exists.error === "工具不存在" ? 404 : 500 },
+    );
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.from("ai_tools").delete().eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ message: "删除 AI 工具失败" }, { status: 500 });
+  }
+
+  return NextResponse.json({ message: "AI 工具已删除" });
 }

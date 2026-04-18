@@ -43,12 +43,16 @@ export const updateSession = async (request: NextRequest) => {
       error: userError,
     } = await supabase.auth.getUser();
 
+    const isAdminRoute =
+      request.nextUrl.pathname.startsWith("/protected") ||
+      request.nextUrl.pathname.startsWith("/admin");
+
     // protected routes
-    if (request.nextUrl.pathname.startsWith("/protected") && userError) {
+    if (isAdminRoute && userError) {
       return NextResponse.redirect(new URL("/sign-in", request.url));
     }
 
-    if (request.nextUrl.pathname.startsWith("/protected") && user) {
+    if (isAdminRoute && user) {
       const admin = await isAdminUser(user.id);
 
       if (!admin) {

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 const navItems = [
   { href: "/protected", label: "概览" },
   { href: "/protected/tools", label: "AI 工具管理" },
-  { href: "/protected/review", label: "审核" },
+  { href: "/admin/submissions", label: "审核中心" },
   { href: "/protected/users", label: "用户管理" },
 ];
 
@@ -17,7 +17,9 @@ export function TopNav() {
   return (
     <nav className="flex flex-wrap gap-2">
       {navItems.map((item) => {
-        const isActive = pathname === item.href;
+        const isActive =
+          pathname === item.href ||
+          (item.href !== "/protected" && pathname.startsWith(`${item.href}/`));
 
         return (
           <Link
