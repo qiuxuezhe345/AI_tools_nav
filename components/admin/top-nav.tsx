@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/protected", label: "概览" },
+  { href: "/protected/categories", label: "工具分类" },
   { href: "/protected/tools", label: "AI 工具管理" },
   { href: "/admin/submissions", label: "审核中心" },
   { href: "/protected/users", label: "用户管理" },

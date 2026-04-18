@@ -11,7 +11,7 @@ export default async function ProtectedPage() {
         <div>
           <h2 className="text-xl font-semibold text-white">概览</h2>
           <p className="text-sm text-white/60">
-            按 PRD 展示 4 张核心统计卡片，帮助管理员快速判断平台状态。
+            按 PRD 展示 4 张核心统计卡片，并提供后台常用入口，方便快速进入分类、工具、审核和用户管理。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -19,7 +19,14 @@ export default async function ProtectedPage() {
             <Link href="/protected/tools/new">添加 AI 工具</Link>
           </Button>
           <Button asChild className="bg-white text-black hover:bg-white/90">
-            <Link href="/protected/review">前往审核页</Link>
+            <Link href="/admin/submissions">前往审核中心</Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="border-white/15 bg-transparent text-white hover:bg-white hover:text-black"
+          >
+            <Link href="/protected/categories">前往工具分类</Link>
           </Button>
           <Button
             asChild
@@ -54,7 +61,9 @@ export default async function ProtectedPage() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-dashed border-white/15 px-5 py-6 text-sm leading-6 text-white/60">
-        概览页作为后台首页，当前聚焦展示核心统计。AI 工具管理、待审核列表和用户管理已拆分到顶部导航对应的独立页面中。
+        概览页现在也提供了工具分类入口。分类管理页会直接对 `tool_categories`
+        做增删改查，并在删除时检查是否已经被 `ai_tools` 或 `tool_submissions`
+        引用，避免误删影响线上数据。
       </div>
     </section>
   );
