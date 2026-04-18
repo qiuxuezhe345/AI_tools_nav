@@ -16,7 +16,17 @@ export default async function ProtectedPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild className="bg-white text-black hover:bg-white/90">
+            <Link href="/protected/tools/new">添加 AI 工具</Link>
+          </Button>
+          <Button asChild className="bg-white text-black hover:bg-white/90">
             <Link href="/protected/review">前往审核页</Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="border-white/15 bg-transparent text-white hover:bg-white hover:text-black"
+          >
+            <Link href="/protected/tools">前往 AI 工具管理</Link>
           </Button>
           <Button
             asChild
@@ -44,7 +54,7 @@ export default async function ProtectedPage() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-dashed border-white/15 px-5 py-6 text-sm leading-6 text-white/60">
-        概览页作为后台首页，当前聚焦展示核心统计。工具列表、待审核列表和用户管理已拆分到顶部导航对应的独立页面中。
+        概览页作为后台首页，当前聚焦展示核心统计。AI 工具管理、待审核列表和用户管理已拆分到顶部导航对应的独立页面中。
       </div>
     </section>
   );
